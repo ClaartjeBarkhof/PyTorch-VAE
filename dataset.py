@@ -20,7 +20,7 @@ class SyntheticDataset(Dataset):
                  **kwargs):
         self.data_dir = Path(data_path) / "synthetic_data_6_colors"
         self.transforms = transform
-        imgs = sorted([f for f in self.data_dir.iterdir() if f.suffix == '.jpg'])
+        imgs = sorted([f for f in self.data_dir.iterdir() if f.suffix == '.png'])
 
         self.imgs = imgs[:int(len(imgs) * 0.75)] if split == "train" else imgs[int(len(imgs) * 0.75):]
         print(split, "len(imgs)", len(self.imgs))
