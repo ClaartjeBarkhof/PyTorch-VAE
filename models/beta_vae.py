@@ -3,7 +3,7 @@ from models import BaseVAE
 from torch import nn
 from torch.nn import functional as F
 from .types_ import *
-
+from DCGAN_encoder_decoder import DCGAN_Encoder, DCGAN_Decoder
 
 class BetaVAE(BaseVAE):
 
@@ -17,6 +17,7 @@ class BetaVAE(BaseVAE):
                  gamma:float = 1000.,
                  max_capacity: int = 25,
                  Capacity_max_iter: int = 1e5,
+                 dcgan: bool = True,
                  loss_type:str = 'B',
                  **kwargs) -> None:
         super(BetaVAE, self).__init__()
@@ -28,62 +29,68 @@ class BetaVAE(BaseVAE):
         self.C_max = torch.Tensor([max_capacity])
         self.C_stop_iter = Capacity_max_iter
 
-        modules = []
-        if hidden_dims is None:
-            hidden_dims = [32, 64, 128, 256, 512]
+        self.dcgan = dcgan
 
-        # Build Encoder
-        for h_dim in hidden_dims:
-            modules.append(
-                nn.Sequential(
-                    nn.Conv2d(in_channels, out_channels=h_dim,
-                              kernel_size= 3, stride= 2, padding  = 1),
-                    nn.BatchNorm2d(h_dim),
-                    nn.LeakyReLU())
-            )
-            in_channels = h_dim
+        if not self.dcgan:
+          modules = []
+          if hidden_dims is None:
+              hidden_dims = [32, 64, 128, 256, 512]
 
-        self.encoder = nn.Sequential(*modules)
-        self.fc_mu = nn.Linear(hidden_dims[-1]*4, latent_dim)
-        self.fc_var = nn.Linear(hidden_dims[-1]*4, latent_dim)
+          # Build Encoder
+          for h_dim in hidden_dims:
+              modules.append(
+                  nn.Sequential(
+                      nn.Conv2d(in_channels, out_channels=h_dim,
+                                kernel_size= 3, stride= 2, padding  = 1),
+                      nn.BatchNorm2d(h_dim),
+                      nn.LeakyReLU())
+              )
+              in_channels = h_dim
 
-
-        # Build Decoder
-        modules = []
-
-        self.decoder_input = nn.Linear(latent_dim, hidden_dims[-1] * 4)
-
-        hidden_dims.reverse()
-
-        for i in range(len(hidden_dims) - 1):
-            modules.append(
-                nn.Sequential(
-                    nn.ConvTranspose2d(hidden_dims[i],
-                                       hidden_dims[i + 1],
-                                       kernel_size=3,
-                                       stride = 2,
-                                       padding=1,
-                                       output_padding=1),
-                    nn.BatchNorm2d(hidden_dims[i + 1]),
-                    nn.LeakyReLU())
-            )
+          self.encoder = nn.Sequential(*modules)
+          self.fc_mu = nn.Linear(hidden_dims[-1]*4, latent_dim)
+          self.fc_var = nn.Linear(hidden_dims[-1]*4, latent_dim)
 
 
+          # Build Decoder
+          modules = []
 
-        self.decoder = nn.Sequential(*modules)
+          self.decoder_input = nn.Linear(latent_dim, hidden_dims[-1] * 4)
 
-        self.final_layer = nn.Sequential(
-                            nn.ConvTranspose2d(hidden_dims[-1],
-                                               hidden_dims[-1],
-                                               kernel_size=3,
-                                               stride=2,
-                                               padding=1,
-                                               output_padding=1),
-                            nn.BatchNorm2d(hidden_dims[-1]),
-                            nn.LeakyReLU(),
-                            nn.Conv2d(hidden_dims[-1], out_channels= 3,
-                                      kernel_size= 3, padding= 1),
-                            nn.Tanh())
+          hidden_dims.reverse()
+
+          for i in range(len(hidden_dims) - 1):
+              modules.append(
+                  nn.Sequential(
+                      nn.ConvTranspose2d(hidden_dims[i],
+                                        hidden_dims[i + 1],
+                                        kernel_size=3,
+                                        stride = 2,
+                                        padding=1,
+                                        output_padding=1),
+                      nn.BatchNorm2d(hidden_dims[i + 1]),
+                      nn.LeakyReLU())
+              )
+
+
+
+          self.decoder = nn.Sequential(*modules)
+
+          self.final_layer = nn.Sequential(
+                              nn.ConvTranspose2d(hidden_dims[-1],
+                                                hidden_dims[-1],
+                                                kernel_size=3,
+                                                stride=2,
+                                                padding=1,
+                                                output_padding=1),
+                              nn.BatchNorm2d(hidden_dims[-1]),
+                              nn.LeakyReLU(),
+                              nn.Conv2d(hidden_dims[-1], out_channels= 3,
+                                        kernel_size= 3, padding= 1),
+                              nn.Tanh())
+        else:
+          self.encoder = DCGAN_Encoder(latent_dim=latent_dim, num_channels=in_channels, n_feature_maps=64)
+          self.decoder = DCGAN_Decoder(latent_dim=latent_dim, num_channels=in_channels, n_feature_maps=64)
 
     def encode(self, input: Tensor) -> List[Tensor]:
         """
@@ -92,21 +99,31 @@ class BetaVAE(BaseVAE):
         :param input: (Tensor) Input tensor to encoder [N x C x H x W]
         :return: (Tensor) List of latent codes
         """
-        result = self.encoder(input)
-        result = torch.flatten(result, start_dim=1)
+        if not self.dcgan:
+          result = self.encoder(input)
+          result = torch.flatten(result, start_dim=1)
 
-        # Split the result into mu and var components
-        # of the latent Gaussian distribution
-        mu = self.fc_mu(result)
-        log_var = self.fc_var(result)
+          # Split the result into mu and var components
+          # of the latent Gaussian distribution
+          mu = self.fc_mu(result)
+          log_var = self.fc_var(result)
+        else:
+          # print("beta vae encoder")
+          mu, log_var = self.encoder(input)
 
         return [mu, log_var]
 
     def decode(self, z: Tensor) -> Tensor:
-        result = self.decoder_input(z)
-        result = result.view(-1, 512, 2, 2)
-        result = self.decoder(result)
-        result = self.final_layer(result)
+
+        if not self.dcgan:
+          result = self.decoder_input(z)
+          result = result.view(-1, 512, 2, 2)
+          result = self.decoder(result)
+          result = self.final_layer(result)
+        else:
+          # print("beta vae decoder")
+          result = self.decoder(z)
+
         return result
 
     def reparameterize(self, mu: Tensor, logvar: Tensor) -> Tensor:
