@@ -14,14 +14,26 @@ import zipfile
 # Add your custom dataset class here
 class SyntheticDataset(Dataset):
     def __init__(self,
+                 dataset_name: str,
                  data_path: str,
                  split: str,
                  transform: Callable,
                  **kwargs):
-        # self.data_dir = Path(data_path) / "synthetic_data_6_colors"
-        self.data_dir = Path(data_path) / "synthetic_shapes_random_colors"
+
+        if dataset_name == "celeba":
+            self.data_dir = Path(data_path) / "celeba/img_align_celeba"
+        elif dataset_name == "synthetic_random":
+            self.data_dir = Path(data_path) / "synthetic_shapes_random_colors"
+        else:
+            self.data_dir = Path(data_path) / "synthetic_data_6_colors"
+
+        print("datadir=", self.data_dir)
         self.transforms = transform
-        imgs = sorted([f for f in self.data_dir.iterdir() if f.suffix == '.png'])
+
+        if "celeb" in str(self.data_dir):
+            imgs = sorted([f for f in self.data_dir.iterdir() if f.suffix == '.jpg'])
+        else:
+            imgs = sorted([f for f in self.data_dir.iterdir() if f.suffix == '.png'])
 
         self.imgs = imgs[:int(len(imgs) * 0.9)] if split == "train" else imgs[int(len(imgs) * 0.9):]
         print(split, "len(imgs)", len(self.imgs))
@@ -96,6 +108,7 @@ class VAEDataset(LightningDataModule):
     def __init__(
             self,
             data_path: str,
+            dataset_name: str,
             train_batch_size: int = 8,
             val_batch_size: int = 8,
             patch_size: Union[int, Sequence[int]] = (256, 256),
@@ -106,6 +119,7 @@ class VAEDataset(LightningDataModule):
         super().__init__()
 
         self.data_dir = data_path
+        self.dataset_name = dataset_name
         self.train_batch_size = train_batch_size
         self.val_batch_size = val_batch_size
         self.patch_size = patch_size
@@ -141,46 +155,65 @@ class VAEDataset(LightningDataModule):
 
         #       =========================  CelebA Dataset  =========================
 
-        # train_transforms = transforms.Compose([transforms.RandomHorizontalFlip(),
-        #                                       transforms.CenterCrop(148),
-        #                                       transforms.Resize(self.patch_size),
-        #                                       transforms.ToTensor(),])
+        # print("Using CelebA")
 
-        # val_transforms = transforms.Compose([transforms.RandomHorizontalFlip(),
-        #                                     transforms.CenterCrop(148),
-        #                                     transforms.Resize(self.patch_size),
-        #                                     transforms.ToTensor(),])
+        if self.dataset_name == "celeba":
+            print("Using CelebA")
+            train_transforms = transforms.Compose([transforms.RandomHorizontalFlip(),
+                                                  transforms.CenterCrop(148),
+                                                  transforms.Resize(self.patch_size),
+                                                  transforms.ToTensor(),])
 
-        # self.train_dataset = MyCelebA(
-        #     self.data_dir,
-        #     split='train',
-        #     transform=train_transforms,
-        #     download=False,
-        # )
+            val_transforms = transforms.Compose([transforms.RandomHorizontalFlip(),
+                                                transforms.CenterCrop(148),
+                                                transforms.Resize(self.patch_size),
+                                                transforms.ToTensor(),])
 
-        # # Replace CelebA with your dataset
-        # self.val_dataset = MyCelebA(
-        #     self.data_dir,
-        #     split='test',
-        #     transform=val_transforms,
-        #     download=False,
-        # )
+            # self.train_dataset = MyCelebA(
+            #     self.data_dir,
+            #     split='train',
+            #     transform=train_transforms,
+            #     download=False,
+            # )
+            #
+            # # Replace CelebA with your dataset
+            # self.val_dataset = MyCelebA(
+            #     self.data_dir,
+            #     split='test',
+            #     transform=val_transforms,
+            #     download=False,
+            # )
 
-        train_transforms = transforms.Compose([transforms.RandomHorizontalFlip(),
-                                               transforms.Resize(self.patch_size),
-                                               transforms.ToTensor(), ])
+        elif self.dataset_name == "synthetic_random":
+            print("Using synthetic_random dataset")
+            train_transforms = transforms.Compose([transforms.RandomHorizontalFlip(),
+                                                   transforms.Resize(self.patch_size),
+                                                   transforms.ToTensor(),
+                                                   transforms.Normalize((0.5330, 0.5264, 0.5296),
+                                                                        (0.3773, 0.3776, 0.3732))])
 
-        val_transforms = transforms.Compose([transforms.RandomHorizontalFlip(),
-                                             transforms.Resize(self.patch_size),
-                                             transforms.ToTensor(), ])
+            val_transforms = transforms.Compose([transforms.RandomHorizontalFlip(),
+                                                 transforms.Resize(self.patch_size),
+                                                 transforms.ToTensor(),
+                                                 transforms.Normalize((0.5330, 0.5264, 0.5296),
+                                                                      (0.3773, 0.3776, 0.3732))])
+
+        elif self.dataset_name == "synthetic_6":
+            print("Using synthetic_6 dataset")
+            print("Did not implement transforms for synthetic_6, aborting...")
+            raise NotImplementedError
+        else:
+            raise NotImplementedError
 
         self.train_dataset = SyntheticDataset(
+            self.dataset_name,
             self.data_dir,
             split='train',
             transform=train_transforms,
         )
 
         self.val_dataset = SyntheticDataset(
+            self.dataset_name,
             self.data_dir,
             split='val',
             transform=val_transforms,
