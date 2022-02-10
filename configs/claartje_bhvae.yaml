@@ -12,7 +12,6 @@ data_params:
   patch_size: 64
   num_workers: 4
 
-
 exp_params:
   LR: 0.005
   weight_decay: 0.0
@@ -21,8 +20,8 @@ exp_params:
   manual_seed: 1265
 
 trainer_params:
-  gpus: [1]
-  max_epochs: 10
+  gpus: [0]
+  max_epochs: 150
 
 logging_params:
   save_dir: "logs/"
