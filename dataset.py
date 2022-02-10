@@ -22,7 +22,7 @@ class SyntheticDataset(Dataset):
         self.transforms = transform
         imgs = sorted([f for f in self.data_dir.iterdir() if f.suffix == '.png'])
 
-        self.imgs = imgs[:int(len(imgs) * 0.75)] if split == "train" else imgs[int(len(imgs) * 0.75):]
+        self.imgs = imgs[:int(len(imgs) * 0.9)] if split == "train" else imgs[int(len(imgs) * 0.9):]
         print(split, "len(imgs)", len(self.imgs))
 
     def __len__(self):
