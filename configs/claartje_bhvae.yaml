@@ -6,7 +6,7 @@ model_params:
   beta: 10.
 
 data_params:
-  data_path: "Data/"
+  data_path: "/content/drive/MyDrive/Datasets/"
   train_batch_size: 64
   val_batch_size:  64
   patch_size: 64

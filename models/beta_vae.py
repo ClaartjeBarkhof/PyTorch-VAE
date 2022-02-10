@@ -22,6 +22,8 @@ class BetaVAE(BaseVAE):
                  **kwargs) -> None:
         super(BetaVAE, self).__init__()
 
+        print(f"Using DCGAN architecture = {dcgan}")
+
         self.latent_dim = latent_dim
         self.beta = beta
         self.gamma = gamma
@@ -99,6 +101,9 @@ class BetaVAE(BaseVAE):
         :param input: (Tensor) Input tensor to encoder [N x C x H x W]
         :return: (Tensor) List of latent codes
         """
+
+        # print("INPUT SHAPE", input.shape)
+
         if not self.dcgan:
           result = self.encoder(input)
           result = torch.flatten(result, start_dim=1)
