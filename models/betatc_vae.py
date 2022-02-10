@@ -4,7 +4,7 @@ from torch import nn
 from torch.nn import functional as F
 from .types_ import *
 import math
-from DCGAN_encoder_decoder import DCGAN_Encoder, DCGAN_Decoder
+from .DCGAN_encoder_decoder import DCGAN_Encoder, DCGAN_Decoder
 
 class BetaTCVAE(BaseVAE):
     num_iter = 0  # Global static variable to keep track of iterations

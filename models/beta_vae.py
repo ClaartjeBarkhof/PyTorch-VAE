@@ -3,7 +3,7 @@ from models import BaseVAE
 from torch import nn
 from torch.nn import functional as F
 from .types_ import *
-from DCGAN_encoder_decoder import DCGAN_Encoder, DCGAN_Decoder
+from .DCGAN_encoder_decoder import DCGAN_Encoder, DCGAN_Decoder
 
 class BetaVAE(BaseVAE):
 
@@ -153,12 +153,15 @@ class BetaVAE(BaseVAE):
         log_var = args[3]
         kld_weight = kwargs['M_N']  # Account for the minibatch samples from the dataset
 
-        recons_loss =F.mse_loss(recons, input)
+        recons_loss = F.mse_loss(recons, input)
 
         kld_loss = torch.mean(-0.5 * torch.sum(1 + log_var - mu ** 2 - log_var.exp(), dim = 1), dim = 0)
 
+        weighted_kl = 0.0
+
         if self.loss_type == 'H': # https://openreview.net/forum?id=Sy2fzU9gl
-            loss = recons_loss + self.beta * kld_weight * kld_loss
+            weighted_kl = self.beta * kld_weight * kld_loss
+            loss = recons_loss + weighted_kl
         elif self.loss_type == 'B': # https://arxiv.org/pdf/1804.03599.pdf
             self.C_max = self.C_max.to(input.device)
             C = torch.clamp(self.C_max/self.C_stop_iter * self.num_iter, 0, self.C_max.data[0])
@@ -166,7 +169,7 @@ class BetaVAE(BaseVAE):
         else:
             raise ValueError('Undefined loss type.')
 
-        return {'loss': loss, 'Reconstruction_Loss':recons_loss, 'KLD':kld_loss}
+        return {'loss': loss, 'Reconstruction_Loss':recons_loss, 'KLD':kld_loss} #, 'weighted_kl':weighted_kl
 
     def sample(self,
                num_samples:int,
