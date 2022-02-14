@@ -1,10 +1,15 @@
+import sys
+sys.path.append("/Users/claartje/Dropbox/Werk/bakken_baeck_2022/Code/PyTorch-VAE")
+
 import torch
 from models import BaseVAE
 from torch import nn
 from torch.nn import functional as F
-from .types_ import *
+from types_ import *
 import math
-from .DCGAN_encoder_decoder import DCGAN_Encoder, DCGAN_Decoder
+from DCGAN_encoder_decoder import DCGAN_Encoder, DCGAN_Decoder
+from custom_architectures import CustomEncoder, CustomDecoder
+
 
 class BetaTCVAE(BaseVAE):
     num_iter = 0  # Global static variable to keep track of iterations
@@ -14,23 +19,32 @@ class BetaTCVAE(BaseVAE):
                  latent_dim: int,
                  hidden_dims: List = None,
                  anneal_steps: int = 200,
+                 image_dim: int = 64,
                  alpha: float = 1.,
                  beta: float = 6.,
                  gamma: float = 1.,
-                 dcgan: bool = True,
+                 dcgan: bool = False,
+                 custom_architecture: bool = False,
                  **kwargs) -> None:
         super(BetaTCVAE, self).__init__()
 
+        assert not (dcgan and custom_architecture), "either dcgan or custom_architecture may be true, not both"
+
+        print(f"Using DCGAN architecture = {dcgan}")
+        print(f"Using custom architecture = {custom_architecture}")
+
         self.latent_dim = latent_dim
         self.anneal_steps = anneal_steps
+        self.image_dim = image_dim
 
         self.alpha = alpha
         self.beta = beta
         self.gamma = gamma
 
         self.dcgan = dcgan
+        self.custom_architecture = custom_architecture
 
-        if not self.dcgan:
+        if not (self.dcgan or self.custom_architecture):
 
             modules = []
             if hidden_dims is None:
@@ -85,8 +99,12 @@ class BetaTCVAE(BaseVAE):
                           kernel_size=3, padding=1),
                 nn.Tanh())
         else:
-            self.encoder = DCGAN_Encoder(latent_dim=latent_dim, num_channels=in_channels, n_feature_maps=64)
-            self.decoder = DCGAN_Decoder(latent_dim=latent_dim, num_channels=in_channels, n_feature_maps=64)
+            if self.dcgan:
+                self.encoder = DCGAN_Encoder(latent_dim=latent_dim, num_channels=in_channels, n_feature_maps=64)
+                self.decoder = DCGAN_Decoder(latent_dim=latent_dim, num_channels=in_channels, n_feature_maps=64)
+            else:
+                self.encoder = CustomEncoder(latent_dim=latent_dim, image_dim=self.image_dim)
+                self.decoder = CustomDecoder(latent_dim=latent_dim, image_dim=self.image_dim)
 
     def encode(self, input: Tensor) -> List[Tensor]:
         """
@@ -96,7 +114,7 @@ class BetaTCVAE(BaseVAE):
         :return: (Tensor) List of latent codes
         """
 
-        if not self.dcgan:
+        if not (self.dcgan or self.custom_architecture):
             result = self.encoder(input)
 
             result = torch.flatten(result, start_dim=1)
@@ -119,7 +137,7 @@ class BetaTCVAE(BaseVAE):
         :param z: (Tensor) [B x D]
         :return: (Tensor) [B x C x H x W]
         """
-        if not self.dcgan:
+        if not (self.dcgan or self.custom_architecture):
             result = self.decoder_input(z)
             result = result.view(-1, 32, 4, 4)
             result = self.decoder(result)
@@ -254,3 +272,9 @@ class BetaTCVAE(BaseVAE):
         """
 
         return self.forward(x)[0]
+
+if __name__ == "__main__":
+    vae = BetaTCVAE(in_channels=3, latent_dim=10, image_dim=64, custom_architecture=True)
+    dummy_input = torch.randn((4, 3, 64, 64))
+    with torch.no_grad():
+        out = vae(dummy_input)

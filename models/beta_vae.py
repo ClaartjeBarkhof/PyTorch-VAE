@@ -1,9 +1,13 @@
+import sys
+sys.path.append("/Users/claartje/Dropbox/Werk/bakken_baeck_2022/Code/PyTorch-VAE")
+
 import torch
 from models import BaseVAE
 from torch import nn
 from torch.nn import functional as F
-from .types_ import *
-from .DCGAN_encoder_decoder import DCGAN_Encoder, DCGAN_Decoder
+from types_ import *
+from DCGAN_encoder_decoder import DCGAN_Encoder, DCGAN_Decoder
+from custom_architectures import CustomEncoder, CustomDecoder
 
 class BetaVAE(BaseVAE):
 
@@ -14,17 +18,23 @@ class BetaVAE(BaseVAE):
                  latent_dim: int,
                  hidden_dims: List = None,
                  beta: int = 4,
+                 image_dim: int = 64,
                  gamma:float = 1000.,
                  max_capacity: int = 25,
                  Capacity_max_iter: int = 1e5,
-                 dcgan: bool = True,
+                 dcgan: bool = False,
+                 custom_architecture: bool = False,
                  loss_type:str = 'B',
                  **kwargs) -> None:
         super(BetaVAE, self).__init__()
 
+        assert not (dcgan and custom_architecture), "either dcgan or custom_architecture may be true, not both"
+
         print(f"Using DCGAN architecture = {dcgan}")
+        print(f"Using custom architecture = {custom_architecture}")
 
         self.latent_dim = latent_dim
+        self.image_dim = image_dim
         self.beta = beta
         self.gamma = gamma
         self.loss_type = loss_type
@@ -32,14 +42,15 @@ class BetaVAE(BaseVAE):
         self.C_stop_iter = Capacity_max_iter
 
         self.dcgan = dcgan
+        self.custom_architecture = custom_architecture
 
-        if not self.dcgan:
-          modules = []
-          if hidden_dims is None:
+        if not (self.dcgan or self.custom_architecture):
+            modules = []
+            if hidden_dims is None:
               hidden_dims = [32, 64, 128, 256, 512]
 
-          # Build Encoder
-          for h_dim in hidden_dims:
+            # Build Encoder
+            for h_dim in hidden_dims:
               modules.append(
                   nn.Sequential(
                       nn.Conv2d(in_channels, out_channels=h_dim,
@@ -49,19 +60,19 @@ class BetaVAE(BaseVAE):
               )
               in_channels = h_dim
 
-          self.encoder = nn.Sequential(*modules)
-          self.fc_mu = nn.Linear(hidden_dims[-1]*4, latent_dim)
-          self.fc_var = nn.Linear(hidden_dims[-1]*4, latent_dim)
+            self.encoder = nn.Sequential(*modules)
+            self.fc_mu = nn.Linear(hidden_dims[-1]*4, latent_dim)
+            self.fc_var = nn.Linear(hidden_dims[-1]*4, latent_dim)
 
 
-          # Build Decoder
-          modules = []
+            # Build Decoder
+            modules = []
 
-          self.decoder_input = nn.Linear(latent_dim, hidden_dims[-1] * 4)
+            self.decoder_input = nn.Linear(latent_dim, hidden_dims[-1] * 4)
 
-          hidden_dims.reverse()
+            hidden_dims.reverse()
 
-          for i in range(len(hidden_dims) - 1):
+            for i in range(len(hidden_dims) - 1):
               modules.append(
                   nn.Sequential(
                       nn.ConvTranspose2d(hidden_dims[i],
@@ -76,9 +87,9 @@ class BetaVAE(BaseVAE):
 
 
 
-          self.decoder = nn.Sequential(*modules)
+            self.decoder = nn.Sequential(*modules)
 
-          self.final_layer = nn.Sequential(
+            self.final_layer = nn.Sequential(
                               nn.ConvTranspose2d(hidden_dims[-1],
                                                 hidden_dims[-1],
                                                 kernel_size=3,
@@ -91,8 +102,12 @@ class BetaVAE(BaseVAE):
                                         kernel_size= 3, padding= 1),
                               nn.Tanh())
         else:
-          self.encoder = DCGAN_Encoder(latent_dim=latent_dim, num_channels=in_channels, n_feature_maps=64)
-          self.decoder = DCGAN_Decoder(latent_dim=latent_dim, num_channels=in_channels, n_feature_maps=64)
+            if self.dcgan:
+                self.encoder = DCGAN_Encoder(latent_dim=latent_dim, num_channels=in_channels, n_feature_maps=64)
+                self.decoder = DCGAN_Decoder(latent_dim=latent_dim, num_channels=in_channels, n_feature_maps=64)
+            else:
+                self.encoder = CustomEncoder(latent_dim=latent_dim, image_dim=self.image_dim)
+                self.decoder = CustomDecoder(latent_dim=latent_dim, image_dim=self.image_dim)
 
     def encode(self, input: Tensor) -> List[Tensor]:
         """
@@ -104,7 +119,7 @@ class BetaVAE(BaseVAE):
 
         # print("INPUT SHAPE", input.shape)
 
-        if not self.dcgan:
+        if not (self.dcgan or self.custom_architecture):
           result = self.encoder(input)
           result = torch.flatten(result, start_dim=1)
 
@@ -120,7 +135,7 @@ class BetaVAE(BaseVAE):
 
     def decode(self, z: Tensor) -> Tensor:
 
-        if not self.dcgan:
+        if not (self.dcgan or self.custom_architecture):
           result = self.decoder_input(z)
           result = result.view(-1, 512, 2, 2)
           result = self.decoder(result)
@@ -202,3 +217,9 @@ class BetaVAE(BaseVAE):
         """
 
         return self.forward(x)[0]
+
+if __name__ == "__main__":
+    vae = BetaVAE(in_channels=3, latent_dim=10, image_dim=64, dcgan=False, custom_architecture=True)
+    dummy_input = torch.randn((4, 3, 64, 64))
+    with torch.no_grad():
+        out = vae(dummy_input)
