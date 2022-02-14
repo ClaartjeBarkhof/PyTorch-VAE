@@ -1,13 +1,12 @@
-import sys
-sys.path.append("/Users/claartje/Dropbox/Werk/bakken_baeck_2022/Code/PyTorch-VAE")
-
 import torch
 from models import BaseVAE
 from torch import nn
 from torch.nn import functional as F
-from types_ import *
-from DCGAN_encoder_decoder import DCGAN_Encoder, DCGAN_Decoder
-from custom_architectures import CustomEncoder, CustomDecoder
+from .types_ import *
+import math
+from .DCGAN_encoder_decoder import DCGAN_Encoder, DCGAN_Decoder
+from .custom_architectures import CustomEncoder, CustomDecoder
+
 
 class BetaVAE(BaseVAE):
 
