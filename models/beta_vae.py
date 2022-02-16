@@ -31,7 +31,9 @@ class BetaVAE(BaseVAE):
 
         print(f"Using DCGAN architecture = {dcgan}")
         print(f"Using custom architecture = {custom_architecture}")
+        print(f"In channels:", in_channels)
 
+        self.channels = in_channels
         self.latent_dim = latent_dim
         self.image_dim = image_dim
         self.beta = beta
@@ -84,29 +86,41 @@ class BetaVAE(BaseVAE):
                       nn.LeakyReLU())
               )
 
-
-
             self.decoder = nn.Sequential(*modules)
 
-            self.final_layer = nn.Sequential(
-                              nn.ConvTranspose2d(hidden_dims[-1],
-                                                hidden_dims[-1],
-                                                kernel_size=3,
-                                                stride=2,
-                                                padding=1,
-                                                output_padding=1),
-                              nn.BatchNorm2d(hidden_dims[-1]),
-                              nn.LeakyReLU(),
-                              nn.Conv2d(hidden_dims[-1], out_channels= 3,
-                                        kernel_size= 3, padding= 1),
-                              nn.Tanh())
+            if in_channels == 3:
+                self.final_layer = nn.Sequential(
+                                  nn.ConvTranspose2d(hidden_dims[-1],
+                                                    hidden_dims[-1],
+                                                    kernel_size=3,
+                                                    stride=2,
+                                                    padding=1,
+                                                    output_padding=1),
+                                  nn.BatchNorm2d(hidden_dims[-1]),
+                                  nn.LeakyReLU(),
+                                  nn.Conv2d(hidden_dims[-1], out_channels= self.channels,
+                                            kernel_size= 3, padding= 1),
+                                  nn.Tanh())
+            else:
+                self.final_layer = nn.Sequential(
+                    nn.ConvTranspose2d(hidden_dims[-1],
+                                       hidden_dims[-1],
+                                       kernel_size=3,
+                                       stride=2,
+                                       padding=1,
+                                       output_padding=1),
+                    nn.BatchNorm2d(hidden_dims[-1]),
+                    nn.LeakyReLU(),
+                    nn.Conv2d(hidden_dims[-1], out_channels=self.channels,
+                              kernel_size=3, padding=1),
+                    nn.Sigmoid())
         else:
             if self.dcgan:
                 self.encoder = DCGAN_Encoder(latent_dim=latent_dim, num_channels=in_channels, n_feature_maps=64)
                 self.decoder = DCGAN_Decoder(latent_dim=latent_dim, num_channels=in_channels, n_feature_maps=64)
             else:
-                self.encoder = CustomEncoder(latent_dim=latent_dim, image_dim=self.image_dim)
-                self.decoder = CustomDecoder(latent_dim=latent_dim, image_dim=self.image_dim)
+                self.encoder = CustomEncoder(latent_dim=latent_dim, image_dim=self.image_dim, in_channels=in_channels)
+                self.decoder = CustomDecoder(latent_dim=latent_dim, image_dim=self.image_dim, channels=in_channels)
 
     def encode(self, input: Tensor) -> List[Tensor]:
         """
@@ -136,9 +150,13 @@ class BetaVAE(BaseVAE):
 
         if not (self.dcgan or self.custom_architecture):
           result = self.decoder_input(z)
+          #print("1", result.shape)
           result = result.view(-1, 512, 2, 2)
+          #print("2", result.shape)
           result = self.decoder(result)
+          #print("3", result.shape)
           result = self.final_layer(result)
+          #print("4", result.shape)
         else:
           # print("beta vae decoder")
           result = self.decoder(z)
@@ -181,6 +199,7 @@ class BetaVAE(BaseVAE):
         if self.loss_type == 'H': # https://openreview.net/forum?id=Sy2fzU9gl
             weighted_kl = self.beta * kld_weight * kld_loss
             loss = recons_loss + weighted_kl
+            return {'loss': loss, 'Reconstruction_Loss': recons_loss, 'KLD': kld_loss, "weighted_kl": weighted_kl}  # , 'weighted_kl':weighted_kl
         elif self.loss_type == 'B': # https://arxiv.org/pdf/1804.03599.pdf
             self.C_max = self.C_max.to(input.device)
             C = torch.clamp(self.C_max/self.C_stop_iter * self.num_iter, 0, self.C_max.data[0])

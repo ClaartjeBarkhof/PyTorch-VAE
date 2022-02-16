@@ -3,14 +3,14 @@ from torch import nn
 import numpy as np
 
 class CustomEncoder(nn.Module):
-    def __init__(self, latent_dim=10, image_dim=128, hidden_dims=[32, 64, 128, 256, 512, 512]):
+    def __init__(self, latent_dim=10, image_dim=128, in_channels=3, hidden_dims=[32, 64, 128, 256, 512, 512]):
         super(CustomEncoder, self).__init__()
 
         self.image_dim = image_dim
 
         modules = []
 
-        in_channels = 3
+        self.in_channels = in_channels
         # Build Encoder
         for h_dim in hidden_dims:
             modules.append(
@@ -48,10 +48,11 @@ class CustomEncoder(nn.Module):
 
 
 class CustomDecoder(nn.Module):
-    def __init__(self, latent_dim=10, image_dim=128):
+    def __init__(self, latent_dim=10, image_dim=128, channels=3):
         super(CustomDecoder, self).__init__()
 
         self.image_dim = image_dim
+        self.channels = channels
 
         # Build Decoder
         modules = []
@@ -77,20 +78,32 @@ class CustomDecoder(nn.Module):
 
         self.decoder = nn.Sequential(*modules)
 
-        self.final_layer = nn.Sequential(
-            nn.ConvTranspose2d(hidden_dims[-1],
-                               hidden_dims[-1],
-                               kernel_size=3,
-                               stride=2,
-                               padding=1,
-                               output_padding=1),
-            nn.LeakyReLU(),
-            nn.Conv2d(hidden_dims[-1], out_channels=3,
-                      kernel_size=3, padding=1),
-            nn.Tanh())
+        if channels == 3:
+            self.final_layer = nn.Sequential(
+                nn.ConvTranspose2d(hidden_dims[-1],
+                                   hidden_dims[-1],
+                                   kernel_size=3,
+                                   stride=2,
+                                   padding=1,
+                                   output_padding=1),
+                nn.LeakyReLU(),
+                nn.Conv2d(hidden_dims[-1], out_channels=3,
+                          kernel_size=3, padding=1),
+                nn.Tanh())
+        else:
+            self.final_layer = nn.Sequential(
+                nn.ConvTranspose2d(hidden_dims[-1],
+                                   hidden_dims[-1],
+                                   kernel_size=3,
+                                   stride=2,
+                                   padding=1,
+                                   output_padding=1),
+                nn.LeakyReLU(),
+                nn.Conv2d(hidden_dims[-1], out_channels=1,  # <- 1 output channel
+                          kernel_size=3, padding=1),
+                nn.Sigmoid())  # sigmoid instead of tanh
 
     def forward(self, latent):
-        print("HEey")
         out = self.decoder_input(latent)
         out = out.view(-1, 32, 4, 4)
         out = self.decoder(out)
