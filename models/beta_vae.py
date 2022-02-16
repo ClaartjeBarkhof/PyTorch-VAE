@@ -88,7 +88,8 @@ class BetaVAE(BaseVAE):
 
             self.decoder = nn.Sequential(*modules)
 
-            if in_channels == 3:
+            if self.channels == 3:
+                print("IN CHANNELS = 3")
                 self.final_layer = nn.Sequential(
                                   nn.ConvTranspose2d(hidden_dims[-1],
                                                     hidden_dims[-1],
@@ -102,6 +103,7 @@ class BetaVAE(BaseVAE):
                                             kernel_size= 3, padding= 1),
                                   nn.Tanh())
             else:
+                print("IN CHANNELS = 1")
                 self.final_layer = nn.Sequential(
                     nn.ConvTranspose2d(hidden_dims[-1],
                                        hidden_dims[-1],
