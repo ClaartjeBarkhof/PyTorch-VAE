@@ -1,20 +1,19 @@
 model_params:
   name: 'BetaVAE'
-  in_channels: 3
+  in_channels: 1
   latent_dim: 10
   loss_type: 'H'
   beta: 15.
-  custom_architecture: True
+  custom_architecture: False
   dcgan: False
-  image_dim: 128
+  image_dim: 64
 
 data_params:
-  data_path: "/content/drive/MyDrive/RtBB_experiment_code/Datasets"
-  dataset_name: "synthetic_simple_gradient_128"
+  image_dir: "/content/drive/MyDrive/RtBB_experiment_code/Datasets/synthetic_simple_bw_filled"
   train_batch_size: 64
   val_batch_size:  64
-  patch_size: 128
-  num_workers: 4
+  patch_size: 64
+  num_workers: 2
 
 exp_params:
   LR: 0.0025

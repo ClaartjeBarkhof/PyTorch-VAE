@@ -1,17 +1,19 @@
 model_params:
   name: 'BetaVAE'
   in_channels: 3
-  latent_dim: 32
+  latent_dim: 10
   loss_type: 'H'
   beta: 15.
+  custom_architecture: False
+  dcgan: False
+  image_dim: 64
 
 data_params:
-  data_path: "/content/drive/MyDrive/Datasets/"
-  dataset_name: "synthetic_random"
+  image_dir: "/content/drive/MyDrive/RtBB_experiment_code/Datasets/synthetic_shapes_random_colors"
   train_batch_size: 64
   val_batch_size:  64
   patch_size: 64
-  num_workers: 4
+  num_workers: 2
 
 exp_params:
   LR: 0.0025

@@ -28,9 +28,6 @@ with open(args.filename, 'r') as file:
     except yaml.YAMLError as exc:
         print(exc)
 
-available_datasets = ["celeba", "synthetic_random", "synthetic_6"]
-assert config["data_params"]["dataset_name"] in available_datasets, f"not a valid dataset, options: {available_datasets}"
-
 tb_logger = TensorBoardLogger(save_dir=config['logging_params']['save_dir'],
                                name=config['model_params']['name'],)
 
@@ -52,7 +49,7 @@ runner = Trainer(logger=tb_logger,
                                      monitor= "val_loss",
                                      save_last= True),
                  ],
-                 strategy=DDPPlugin(find_unused_parameters=True),
+                 strategy=DDPPlugin(find_unused_parameters=False),
                  **config['trainer_params'])
 
 

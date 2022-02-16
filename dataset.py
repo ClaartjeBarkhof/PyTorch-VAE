@@ -14,19 +14,12 @@ import zipfile
 # Add your custom dataset class here
 class SyntheticDataset(Dataset):
     def __init__(self,
-                 dataset_name: str,
-                 data_path: str,
+                 data_dir: str,
                  split: str,
                  transform: Callable,
                  **kwargs):
 
-        if dataset_name == "celeba":
-            self.data_dir = Path(data_path) / "celeba/img_align_celeba"
-        elif dataset_name == "synthetic_random":
-            self.data_dir = Path(data_path) / "synthetic_shapes_random_colors"
-        else:
-            self.data_dir = Path(data_path) / "synthetic_data_6_colors"
-
+        self.data_dir = Path(data_dir)
         print("datadir=", self.data_dir)
         self.transforms = transform
 
@@ -107,8 +100,7 @@ class VAEDataset(LightningDataModule):
 
     def __init__(
             self,
-            data_path: str,
-            dataset_name: str,
+            image_dir: str,
             train_batch_size: int = 8,
             val_batch_size: int = 8,
             patch_size: Union[int, Sequence[int]] = (256, 256),
@@ -118,8 +110,7 @@ class VAEDataset(LightningDataModule):
     ):
         super().__init__()
 
-        self.data_dir = data_path
-        self.dataset_name = dataset_name
+        self.data_dir = image_dir
         self.train_batch_size = train_batch_size
         self.val_batch_size = val_batch_size
         self.patch_size = patch_size
@@ -127,96 +118,49 @@ class VAEDataset(LightningDataModule):
         self.pin_memory = pin_memory
 
     def setup(self, stage: Optional[str] = None) -> None:
-        #       =========================  OxfordPets Dataset  =========================
+        print(f"Setting up {self.patch_size}: {self.data_dir}")
 
-        #         train_transforms = transforms.Compose([transforms.RandomHorizontalFlip(),
-        #                                               transforms.CenterCrop(self.patch_size),
-        # #                                               transforms.Resize(self.patch_size),
-        #                                               transforms.ToTensor(),
-        #                                                 transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))])
-
-        #         val_transforms = transforms.Compose([transforms.RandomHorizontalFlip(),
-        #                                             transforms.CenterCrop(self.patch_size),
-        # #                                             transforms.Resize(self.patch_size),
-        #                                             transforms.ToTensor(),
-        #                                               transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))])
-
-        #         self.train_dataset = OxfordPets(
-        #             self.data_dir,
-        #             split='train',
-        #             transform=train_transforms,
-        #         )
-
-        #         self.val_dataset = OxfordPets(
-        #             self.data_dir,
-        #             split='val',
-        #             transform=val_transforms,
-        #         )
-
-        #       =========================  CelebA Dataset  =========================
-
-        # print("Using CelebA")
-
-        if self.dataset_name == "celeba":
+        if  "celeba" in self.data_dir:
             print("Using CelebA")
-            train_transforms = transforms.Compose([transforms.RandomHorizontalFlip(),
+            print("*"* 40)
+            print("** Warning: missing normalize")
+            data_transforms = transforms.Compose([transforms.RandomHorizontalFlip(),
                                                   transforms.CenterCrop(148),
                                                   transforms.Resize(self.patch_size),
                                                   transforms.ToTensor(),])
 
-            val_transforms = transforms.Compose([transforms.RandomHorizontalFlip(),
-                                                transforms.CenterCrop(148),
-                                                transforms.Resize(self.patch_size),
-                                                transforms.ToTensor(),])
-
-            # self.train_dataset = MyCelebA(
-            #     self.data_dir,
-            #     split='train',
-            #     transform=train_transforms,
-            #     download=False,
-            # )
-            #
-            # # Replace CelebA with your dataset
-            # self.val_dataset = MyCelebA(
-            #     self.data_dir,
-            #     split='test',
-            #     transform=val_transforms,
-            #     download=False,
-            # )
-
-        elif self.dataset_name == "synthetic_random":
-            print("Using synthetic_random dataset")
-            train_transforms = transforms.Compose([transforms.RandomHorizontalFlip(),
+        elif "gradient" in self.data_dir or "random" in self.data_dir or "synthetic_6" in self.data_dir:
+            print("Using synthetic coloured dataset")
+            data_transforms = transforms.Compose([transforms.RandomHorizontalFlip(),
                                                    transforms.Resize(self.patch_size),
                                                    transforms.ToTensor(),
                                                    transforms.Normalize((0.5330, 0.5264, 0.5296),
                                                                         (0.3773, 0.3776, 0.3732))])
 
-            val_transforms = transforms.Compose([transforms.RandomHorizontalFlip(),
-                                                 transforms.Resize(self.patch_size),
-                                                 transforms.ToTensor(),
-                                                 transforms.Normalize((0.5330, 0.5264, 0.5296),
-                                                                      (0.3773, 0.3776, 0.3732))])
+        elif "bw" in self.data_dir:
+            print("Using synthetic BW dataset")
+            bw_mean = 0.0441
+            bw_std = 0.5247
+            data_transforms = transforms.Compose([transforms.Grayscale(num_output_channels=1),
+                                                  transforms.RandomHorizontalFlip(),
+                                                  transforms.Resize(self.patch_size),
+                                                  transforms.ToTensor()])
+            # ,
+            #                                                   transforms.Normalize(bw_mean, bw_std)
 
-        elif self.dataset_name == "synthetic_6":
-            print("Using synthetic_6 dataset")
-            print("Did not implement transforms for synthetic_6, aborting...")
-            raise NotImplementedError
         else:
             raise NotImplementedError
 
         self.train_dataset = SyntheticDataset(
-            self.dataset_name,
             self.data_dir,
             split='train',
-            transform=train_transforms,
+            transform=data_transforms,
         )
 
         self.val_dataset = SyntheticDataset(
-            self.dataset_name,
             self.data_dir,
             split='val',
-            transform=val_transforms,
+            transform=data_transforms,
         )
 
     #       ===============================================================
