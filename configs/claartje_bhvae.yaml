@@ -9,7 +9,7 @@ model_params:
   image_dim: 64
 
 data_params:
-  image_dir: "/content/drive/MyDrive/RtBB_experiment_code/Datasets/synthetic_shapes_random_colors"
+  image_dir: "/content/drive/MyDrive/RtBB_experiment_code/Datasets/synthetic_simple_random_64"
   train_batch_size: 64
   val_batch_size:  64
   patch_size: 64
@@ -27,5 +27,5 @@ trainer_params:
   max_epochs: 150
 
 logging_params:
-  save_dir: "logs/"
+  save_dir: "../VAE-logs/"
   name: 'BetaVAE'

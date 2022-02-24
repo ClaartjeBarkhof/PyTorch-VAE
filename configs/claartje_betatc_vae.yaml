@@ -30,5 +30,5 @@ trainer_params:
   max_epochs: 100
 
 logging_params:
-  save_dir: "logs/"
+  save_dir: "../VAE-logs/"
   name: 'BetaTCVAE'
